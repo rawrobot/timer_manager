@@ -119,6 +119,12 @@ impl TimerManager {
                     self.check_expired_timers().await;
                 },
                 
+                // Handle cancellation token
+                _ = self.cancel_token.cancelled() => {
+                    log::info!("Timer manager '{}' cancelled via token", self.name);
+                    break;
+                },
+                
                 // All senders dropped
                 else => {
                     log::info!("Timer manager '{}' shutting down - all senders dropped", self.name);
@@ -311,7 +317,7 @@ mod tests {
     #[tokio::test]
     async fn test_bounded_channel_backpressure() {
         let cancel_token = CancellationToken::new();
-        let (manager, mut handle) = TimerManager::new(
+        let (manager,  handle) = TimerManager::new(
             "test".to_string(),
             Duration::from_millis(10),
             2, // small command buffer
@@ -326,9 +332,73 @@ mod tests {
         handle.set_timer("timer2".to_string(), Duration::from_millis(50)).await.unwrap();
         
         // This should work with try_send
-        let result = handle.try_set_timer("timer3".to_string(), Duration::from_millis(50));
+        let _result = handle.try_set_timer("timer3".to_string(), Duration::from_millis(50));
         // Might succeed or fail depending on timing, but shouldn't panic
 
         handle.shutdown().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_cancellation_token() {
+        let cancel_token = CancellationToken::new();
+        let (manager, mut handle) = TimerManager::new(
+            "test".to_string(),
+            Duration::from_millis(10),
+            10,
+            10,
+            cancel_token.clone(),
+        );
+
+        let manager_task = tokio::spawn(manager.run());
+
+        // Set a timer that should expire
+        handle.set_timer("timer1".to_string(), Duration::from_millis(50)).await.unwrap();
+
+        // Cancel the token
+        cancel_token.cancel();
+
+        // Wait for the manager to shut down
+        let _ = manager_task.await;
+
+        // Try to set a timer after cancellation - this should fail
+        let result = handle.try_set_timer("timer2".to_string(), Duration::from_millis(50));
+        assert!(result.is_err(), "Setting timer after cancellation should fail");
+
+        // Should not receive any timer events since manager was cancelled
+        assert!(handle.try_recv_event().is_err(), "Should not receive events after cancellation");
+    }
+
+    #[tokio::test]
+    async fn test_cancellation_during_timer_operation() {
+        let cancel_token = CancellationToken::new();
+        let (manager, mut handle) = TimerManager::new(
+            "test".to_string(),
+            Duration::from_millis(10),
+            10,
+            10,
+            cancel_token.clone(),
+        );
+
+        let manager_task = tokio::spawn(manager.run());
+
+        // Set multiple timers
+        handle.set_timer("timer1".to_string(), Duration::from_millis(100)).await.unwrap();
+        handle.set_timer("timer2".to_string(), Duration::from_millis(200)).await.unwrap();
+
+        // Wait a bit to ensure timers are set
+        sleep(Duration::from_millis(20)).await;
+
+        // Cancel the token before timers expire
+        cancel_token.cancel();
+
+        // Wait for the manager to shut down
+        let _ = manager_task.await;
+
+        // Timers should not fire since manager was cancelled
+        assert!(handle.try_recv_event().is_err(), "No timer events should be received after cancellation");
+
+        // Subsequent operations should fail
+        let result = handle.try_set_timer("timer3".to_string(), Duration::from_millis(50));
+        assert!(result.is_err(), "Operations after cancellation should fail");
     }
 }
