@@ -1,0 +1,16 @@
+[package]
+name = "timer_manager"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# Error Handling
+thiserror = "2.0"
+# Logging
+log = "0.4.26"
+# Asynchronous Programming
+tokio = { version = "1.45.1", features = ["full", "tracing"] }
+async-trait = "0.1.86"
+futures = "0.3.31"
+tokio-util = "0.7.8"
+
