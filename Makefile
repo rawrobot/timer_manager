@@ -7,72 +7,72 @@ help:	## Show this help message
 
 # Build targets
 build:	## Build the project
-	cargo build
+cargo build
 
 build-release:	## Build the project in release mode
-	cargo build --release
+	carg build --release
 
 # Test targets
 test:	## Run all tests
-	cargo test
+	carg test
 
 test-verbose:	## Run tests with verbose output
-	cargo test -- --nocapture
+	carg test -- --nocapture
 
 test-coverage:	install-tools	## Generate test coverage report
-	cargo tarpaulin --out Html --output-dir coverage
+	carg tarpaulin --out Html --output-dir coverage
 
 test-coverage-ci:	install-tools	## Generate test coverage for CI (lcov format)
-	cargo tarpaulin --out Lcov --output-dir coverage
+	carg tarpaulin --out Lcov --output-dir coverage
 
 test-coverage-lcov: install-tools ## Generate test coverage in LCOV format for CI
-	cargo tarpaulin --out Lcov --output-dir coverage
+	carg tarpaulin --out Lcov --output-dir coverage
 
 # Code quality targets
 check:	## Check code without building
-	cargo check
+	carg check
 
 clippy:	## Run clippy linter
-	cargo clippy -- -D warnings
+	carg clippy -- -D warnings
 
 clippy-fix:	## Run clippy with automatic fixes
-	cargo clippy --fix --allow-dirty --allow-staged
+	carg clippy --fix --allow-dirty --allow-staged
 
 format:	## Format code
-	cargo fmt
+	carg fmt
 
 format-check:	## Check if code is formatted
-	cargo fmt -- --check
+	carg fmt -- --check
 
 # Documentation targets
 doc:	## Generate documentation
-	cargo doc --no-deps
+	carg doc --no-deps
 
 doc-open:	## Generate and open documentation
-	cargo doc --no-deps --open
+	carg doc --no-deps --open
 
 doc-all:	## Generate documentation with dependencies
-	cargo doc
+	carg doc
 
 # Package and publish targets
 package:	## Create a package
-	cargo package
+	carg package
 
 package-list:	## List files that would be included in package
-	cargo package --list
+	carg package --list
 
 publish-dry-run:	## Dry run of publishing to crates.io
-	cargo publish --dry-run
+	carg publish --dry-run
 
 publish:	## Publish to crates.io
-	cargo publish
+	carg publish
 
 publish-ci: ## Publish to crates.io using CARGO_REGISTRY_TOKEN
-	cargo publish --token ${CARGO_REGISTRY_TOKEN}
+	carg publish --token ${CARGO_REGISTRY_TOKEN}
 
 # Example and benchmark targets
 example:	## Run the basic usage example
-	cargo run --example basic_usage
+	carg run --example basic_usage
 
 example-with-logs:	## Run example with logging enabled
 	RUST_LOG=debug cargo run --example basic_usage
