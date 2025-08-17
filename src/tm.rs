@@ -8,16 +8,16 @@ use tokio_util::sync::CancellationToken;
 pub struct TimerManager {
     /// Instance name for logging
     name: String,
-    
+
     /// Channel for receiving timer commands
     command_rx: mpsc::Receiver<TimerCommand>,
-    
+
     /// Channel for sending timer events
     event_tx: mpsc::Sender<TimerEvent>,
-    
+
     /// Timer storage: timer_name -> expiration_time
     timers: HashMap<String, Instant>,
-    
+
     /// Heartbeat interval for timer checks
     heartbeat_interval: Duration,
     //// Cancellation token for graceful shutdown
@@ -28,7 +28,7 @@ pub struct TimerManager {
 pub struct TimerHandle {
     /// Channel for sending commands to the timer manager
     command_tx: mpsc::Sender<TimerCommand>,
-    
+
     /// Channel for receiving timer events
     event_rx: mpsc::Receiver<TimerEvent>,
 }
@@ -36,13 +36,8 @@ pub struct TimerHandle {
 /// Timer command enum
 #[derive(Debug, Clone)]
 pub enum TimerCommand {
-    SetTimer {
-        name: String,
-        duration: Duration,
-    },
-    CancelTimer {
-        name: String,
-    },
+    SetTimer { name: String, duration: Duration },
+    CancelTimer { name: String },
     CancelAllTimers,
     Shutdown,
 }
@@ -50,23 +45,21 @@ pub enum TimerCommand {
 /// Timer event enum
 #[derive(Debug, Clone)]
 pub enum TimerEvent {
-    TimerExpired {
-        name: String,
-    },
+    TimerExpired { name: String },
 }
 
 impl TimerManager {
     /// Create a new TimerManager with bounded channels
-    /// 
+    ///
     /// # Arguments
     /// * `name` - Timer manager instance name
     /// * `heartbeat_interval` - How often to check for expired timers
     /// * `command_buffer_size` - Size of command channel buffer
     /// * `event_buffer_size` - Size of event channel buffer
-    /// 
+    ///
     /// Returns (TimerManager, TimerHandle)
     pub fn new(
-        name: String, 
+        name: String,
         heartbeat_interval: Duration,
         command_buffer_size: usize,
         event_buffer_size: usize,
@@ -113,18 +106,18 @@ impl TimerManager {
                         }
                     }
                 },
-                
+
                 // Check for expired timers
                 _ = heartbeat.tick() => {
                     self.check_expired_timers().await;
                 },
-                
+
                 // Handle cancellation token
                 _ = self.cancel_token.cancelled() => {
                     log::info!("Timer manager '{}' cancelled via token", self.name);
                     break;
                 },
-                
+
                 // All senders dropped
                 else => {
                     log::info!("Timer manager '{}' shutting down - all senders dropped", self.name);
@@ -142,26 +135,26 @@ impl TimerManager {
             TimerCommand::SetTimer { name, duration } => {
                 let expires_at = Instant::now() + duration;
                 let _was_replaced = self.timers.insert(name.clone(), expires_at).is_some();
-                
+
                 // if was_replaced {
                 //     log::debug!("Timer '{}' updated in manager '{}'", name, self.name);
                 // } else {
                 //     log::debug!("Timer '{}' set in manager '{}' to expire in {:?}", name, self.name, duration);
                 // }
-            },
+            }
             TimerCommand::CancelTimer { name } => {
                 if self.timers.remove(&name).is_some() {
                     //log::debug!("Timer '{}' canceled in manager '{}'", name, self.name);
                 }
-            },
+            }
             TimerCommand::CancelAllTimers => {
                 //let count = self.timers.len();
                 self.timers.clear();
                 //log::debug!("Canceled all {} timer(s) in manager '{}'", count, self.name);
-            },
+            }
             TimerCommand::Shutdown => {
                 // Handled in main loop
-            },
+            }
         }
     }
 
@@ -181,18 +174,27 @@ impl TimerManager {
         for name in expired_timers {
             // Remove from storage
             self.timers.remove(&name);
-            
+
             // Send expiration event
             //log::debug!("Timer '{}' expired in manager '{}'", name, self.name);
-            
+
             // Use try_send to avoid blocking if event channel is full
-            if let Err(e) = self.event_tx.try_send(TimerEvent::TimerExpired { name: name.clone() }) {
+            if let Err(e) = self
+                .event_tx
+                .try_send(TimerEvent::TimerExpired { name: name.clone() })
+            {
                 match e {
                     mpsc::error::TrySendError::Full(_) => {
-                        log::warn!("Event channel full, dropping timer expiration for '{}'", name);
-                    },
+                        log::warn!(
+                            "Event channel full, dropping timer expiration for '{}'",
+                            name
+                        );
+                    }
                     mpsc::error::TrySendError::Closed(_) => {
-                        log::warn!("Event channel closed, cannot send timer expiration for '{}'", name);
+                        log::warn!(
+                            "Event channel closed, cannot send timer expiration for '{}'",
+                            name
+                        );
                         break;
                     }
                 }
@@ -203,22 +205,41 @@ impl TimerManager {
 
 impl TimerHandle {
     /// Set a timer (creates new or updates existing)
-    pub async fn set_timer(&self, name: String, duration: Duration) -> Result<(), mpsc::error::SendError<TimerCommand>> {
-        self.command_tx.send(TimerCommand::SetTimer { name, duration }).await
+    pub async fn set_timer(
+        &self,
+        name: String,
+        duration: Duration,
+    ) -> Result<(), mpsc::error::SendError<TimerCommand>> {
+        self.command_tx
+            .send(TimerCommand::SetTimer { name, duration })
+            .await
     }
 
     /// Set a timer (non-blocking)
-    pub fn try_set_timer(&self, name: String, duration: Duration) -> Result<(), mpsc::error::TrySendError<TimerCommand>> {
-        self.command_tx.try_send(TimerCommand::SetTimer { name, duration })
+    pub fn try_set_timer(
+        &self,
+        name: String,
+        duration: Duration,
+    ) -> Result<(), mpsc::error::TrySendError<TimerCommand>> {
+        self.command_tx
+            .try_send(TimerCommand::SetTimer { name, duration })
     }
 
     /// Cancel a specific timer
-    pub async fn cancel_timer(&self, name: String) -> Result<(), mpsc::error::SendError<TimerCommand>> {
-        self.command_tx.send(TimerCommand::CancelTimer { name }).await
+    pub async fn cancel_timer(
+        &self,
+        name: String,
+    ) -> Result<(), mpsc::error::SendError<TimerCommand>> {
+        self.command_tx
+            .send(TimerCommand::CancelTimer { name })
+            .await
     }
 
     /// Cancel a specific timer (non-blocking)
-    pub fn try_cancel_timer(&self, name: String) -> Result<(), mpsc::error::TrySendError<TimerCommand>> {
+    pub fn try_cancel_timer(
+        &self,
+        name: String,
+    ) -> Result<(), mpsc::error::TrySendError<TimerCommand>> {
         self.command_tx.try_send(TimerCommand::CancelTimer { name })
     }
 
@@ -273,7 +294,10 @@ mod tests {
         tokio::spawn(manager.run());
 
         // Set a short timer
-        handle.set_timer("test_timer".to_string(), Duration::from_millis(50)).await.unwrap();
+        handle
+            .set_timer("test_timer".to_string(), Duration::from_millis(50))
+            .await
+            .unwrap();
 
         // Wait for expiration
         let event = handle.recv_event().await.unwrap();
@@ -300,8 +324,11 @@ mod tests {
         tokio::spawn(manager.run());
 
         // Set a timer
-        handle.set_timer("test_timer".to_string(), Duration::from_millis(100)).await.unwrap();
-        
+        handle
+            .set_timer("test_timer".to_string(), Duration::from_millis(100))
+            .await
+            .unwrap();
+
         // Cancel it immediately
         handle.cancel_timer("test_timer".to_string()).await.unwrap();
 
@@ -317,7 +344,7 @@ mod tests {
     #[tokio::test]
     async fn test_bounded_channel_backpressure() {
         let cancel_token = CancellationToken::new();
-        let (manager,  handle) = TimerManager::new(
+        let (manager, handle) = TimerManager::new(
             "test".to_string(),
             Duration::from_millis(10),
             2, // small command buffer
@@ -328,9 +355,15 @@ mod tests {
         tokio::spawn(manager.run());
 
         // Fill up the command channel
-        handle.set_timer("timer1".to_string(), Duration::from_millis(50)).await.unwrap();
-        handle.set_timer("timer2".to_string(), Duration::from_millis(50)).await.unwrap();
-        
+        handle
+            .set_timer("timer1".to_string(), Duration::from_millis(50))
+            .await
+            .unwrap();
+        handle
+            .set_timer("timer2".to_string(), Duration::from_millis(50))
+            .await
+            .unwrap();
+
         // This should work with try_send
         let _result = handle.try_set_timer("timer3".to_string(), Duration::from_millis(50));
         // Might succeed or fail depending on timing, but shouldn't panic
@@ -352,7 +385,10 @@ mod tests {
         let manager_task = tokio::spawn(manager.run());
 
         // Set a timer that should expire
-        handle.set_timer("timer1".to_string(), Duration::from_millis(50)).await.unwrap();
+        handle
+            .set_timer("timer1".to_string(), Duration::from_millis(50))
+            .await
+            .unwrap();
 
         // Cancel the token
         cancel_token.cancel();
@@ -362,10 +398,16 @@ mod tests {
 
         // Try to set a timer after cancellation - this should fail
         let result = handle.try_set_timer("timer2".to_string(), Duration::from_millis(50));
-        assert!(result.is_err(), "Setting timer after cancellation should fail");
+        assert!(
+            result.is_err(),
+            "Setting timer after cancellation should fail"
+        );
 
         // Should not receive any timer events since manager was cancelled
-        assert!(handle.try_recv_event().is_err(), "Should not receive events after cancellation");
+        assert!(
+            handle.try_recv_event().is_err(),
+            "Should not receive events after cancellation"
+        );
     }
 
     #[tokio::test]
@@ -382,8 +424,14 @@ mod tests {
         let manager_task = tokio::spawn(manager.run());
 
         // Set multiple timers
-        handle.set_timer("timer1".to_string(), Duration::from_millis(100)).await.unwrap();
-        handle.set_timer("timer2".to_string(), Duration::from_millis(200)).await.unwrap();
+        handle
+            .set_timer("timer1".to_string(), Duration::from_millis(100))
+            .await
+            .unwrap();
+        handle
+            .set_timer("timer2".to_string(), Duration::from_millis(200))
+            .await
+            .unwrap();
 
         // Wait a bit to ensure timers are set
         sleep(Duration::from_millis(20)).await;
@@ -395,7 +443,10 @@ mod tests {
         let _ = manager_task.await;
 
         // Timers should not fire since manager was cancelled
-        assert!(handle.try_recv_event().is_err(), "No timer events should be received after cancellation");
+        assert!(
+            handle.try_recv_event().is_err(),
+            "No timer events should be received after cancellation"
+        );
 
         // Subsequent operations should fail
         let result = handle.try_set_timer("timer3".to_string(), Duration::from_millis(50));

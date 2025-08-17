@@ -1,7 +1,23 @@
 [package]
 name = "timer_manager"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"  # Changed from "2024" - crates.io doesn't support 2024 edition yet
+authors = ["Your Name <rawrobot@yahoo.com>"]
+description = "A high-performance, asynchronous timer management library for Rust built on top of Tokio"
+license = "MIT"
+repository = "https://github.com/rawrobot/timer_manager"
+homepage = "https://github.com/rawrobot/timer_manager"
+documentation = "https://docs.rs/timer_manager"
+readme = "README.md"
+keywords = ["timer", "async", "tokio", "scheduler", "timeout"]
+categories = ["asynchronous", "concurrency", "development-tools"]
+exclude = [
+    "*.code-workspace",
+    ".gitignore",
+    ".github/",
+    "examples/",
+    "benches/",
+]
 
 [dependencies]
 # Error Handling
@@ -14,3 +30,14 @@ async-trait = "0.1.86"
 futures = "0.3.31"
 tokio-util = "0.7.8"
 
+[dev-dependencies]
+env_logger = "0.11"
+tokio-test = "0.4"
+
+[[example]]
+name = "basic_usage"
+path = "examples/basic_usage.rs"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
