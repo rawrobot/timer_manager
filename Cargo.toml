@@ -11,11 +11,12 @@ documentation = "https://docs.rs/timer_manager"
 readme = "README.md"
 keywords = ["timer", "async", "tokio", "scheduler", "timeout"]
 categories = ["asynchronous", "concurrency", "development-tools"]
-exclude = [
-    "*.code-workspace",
-    ".gitignore",
-    ".github/",
-    "benches/",
+include = [
+    "src/**/*",
+    "examples/**/*",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
 ]
 
 [dependencies]
