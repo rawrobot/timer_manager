@@ -9,8 +9,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  publish:
-    name: Publish to crates.io
+  release:
+    name: Release
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -26,24 +26,20 @@ jobs:
           ~/.cargo/registry
           ~/.cargo/git
           target
-        key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+        key: ubuntu-latest-stable-release-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Install tools
+      run: make install-tools
 
     - name: Pre-release checks
       run: make pre-release
 
     - name: Publish to crates.io
-      run: make publish
+      run: make publish-ci
       env:
         CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
 
-  create-release:
-    name: Create GitHub Release
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Create Release
+    - name: Create GitHub Release
       uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

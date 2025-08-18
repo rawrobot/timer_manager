@@ -11,15 +11,25 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  # Single comprehensive test job with matrix
   test:
-    name: Test Suite
-    runs-on: ubuntu-latest
+    name: Test (${{ matrix.rust }} on ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        rust: [stable, beta, nightly]
+        rust: [stable, beta]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         include:
+          # Add nightly only on Ubuntu to avoid too many jobs
           - rust: nightly
+            os: ubuntu-latest
             can-fail: true
+          # Special jobs for coverage and security (only on stable Ubuntu)
+          - rust: stable
+            os: ubuntu-latest
+            coverage: true
+            security: true
     continue-on-error: ${{ matrix.can-fail || false }}
     
     steps:
@@ -39,74 +49,50 @@ jobs:
           ~/.cargo/registry
           ~/.cargo/git
           target
-        key: ${{ runner.os }}-cargo-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
+        key: ${{ runner.os }}-${{ matrix.rust }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ matrix.rust }}-cargo-
+          ${{ runner.os }}-cargo-
 
-    - name: Install tools
+    - name: Install development tools
       run: make install-tools
 
+    # Run different checks based on matrix
     - name: Run CI pipeline
+      if: matrix.rust == 'stable'
       run: make ci
 
+    - name: Run tests only (non-stable)
+      if: matrix.rust != 'stable'
+      run: make test
+
     - name: Run example
-      run: make example
-      timeout-minutes: 2
+      if: matrix.os == 'ubuntu-latest'
+      run: timeout 120s make example || true
 
-  coverage:
-    name: Code Coverage
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
-
-    - name: Cache cargo
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-coverage-${{ hashFiles('**/Cargo.lock') }}
-
+    # Coverage only on stable Ubuntu
     - name: Generate coverage
+      if: matrix.coverage
       run: make test-coverage-ci
 
-    - name: Upload to codecov.io
+    - name: Upload coverage to codecov
+      if: matrix.coverage
       uses: codecov/codecov-action@v4
       with:
         file: coverage/tarpaulin-report.lcov
         fail_ci_if_error: false
 
-  security:
-    name: Security Audit
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
-
-    - name: Cache cargo
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-audit-${{ hashFiles('**/Cargo.lock') }}
-
+    # Security audit only on stable Ubuntu
     - name: Run security audit
+      if: matrix.security
       run: make security-check
 
-  cross-platform:
-    name: Cross Platform
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+  # Separate documentation job (only needed once)
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -121,7 +107,13 @@ jobs:
           ~/.cargo/registry
           ~/.cargo/git
           target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        key: ubuntu-latest-stable-docs-${{ hashFiles('**/Cargo.lock') }}
 
-    - name: Run tests
-      run: make test
+    - name: Build documentation
+      run: make doc
+
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./target/doc

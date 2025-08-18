@@ -102,7 +102,10 @@ impl TimerManager {
                             break;
                         }
                         _ => {
-                            self.handle_command(command).await;
+                            let shutdown = self.handle_command(command).await;
+                            if shutdown {
+                                break;
+                            }
                         }
                     }
                 },
@@ -130,7 +133,8 @@ impl TimerManager {
     }
 
     /// Handle timer commands
-    async fn handle_command(&mut self, command: TimerCommand) {
+    async fn handle_command(&mut self, command: TimerCommand) -> bool {
+        let mut shutdown = false;
         match command {
             TimerCommand::SetTimer { name, duration } => {
                 let expires_at = Instant::now() + duration;
@@ -153,9 +157,11 @@ impl TimerManager {
                 //log::debug!("Canceled all {} timer(s) in manager '{}'", count, self.name);
             }
             TimerCommand::Shutdown => {
-                // Handled in main loop
+                //log::info!("Timer manager '{}' shutting down", self.name);
+                shutdown = true;
             }
         }
+        shutdown
     }
 
     /// Check for expired timers and fire them
