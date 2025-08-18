@@ -87,33 +87,4 @@ jobs:
       if: matrix.security
       run: make security-check
 
-  # Separate documentation job (only needed once)
-  docs:
-    name: Documentation
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: test
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
-
-    - name: Cache cargo
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ubuntu-latest-stable-docs-${{ hashFiles('**/Cargo.lock') }}
-
-    - name: Build documentation
-      run: make doc
-
-    - name: Deploy to GitHub Pages
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./target/doc
+  
