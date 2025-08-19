@@ -1,4 +1,3 @@
-# File: /home/k14/work/pesonal/github/timer_manager/README.md
 # Timer Manager
 
 A high-performance, asynchronous timer management library for Rust built on top of Tokio. This library provides a robust way to manage multiple named timers with precise expiration handling and graceful shutdown capabilities.
@@ -33,9 +32,9 @@ use std::time::Duration;
 async fn main() {
     // Initialize logging (optional)
     env_logger::init();
-    
+
     let cancel_token = CancellationToken::new();
-    
+
     // Create timer manager with configuration
     let (manager, mut handle) = TimerManager::new(
         "my_timer_manager".to_string(),
